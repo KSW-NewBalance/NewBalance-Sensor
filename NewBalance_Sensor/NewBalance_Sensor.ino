@@ -20,7 +20,7 @@ constexpr char WIFI_SSID[] PROGMEM = "YOUR_WIFI_NAME";
 constexpr char WIFI_PASSWORD[] PROGMEM = "YOUR_WIFI_PASSWORD";
 // See https://thingsboard.io/docs/getting-started-guides/helloworld/
 // to understand how to obtain an access token
-constexpr char TOKEN[] PROGMEM = "YOUR_THIGNSBOARD_TOKEN";
+constexpr char TOKEN[] PROGMEM = "YOUR_THINGSBOARD_TOKEN";
 // Thingsboard we want to establish a connection too
 constexpr char THINGSBOARD_SERVER[] PROGMEM = "demo.thingsboard.io";
 // MQTT port used to communicate with the server, 1883 is the default unencrypted MQTT port
@@ -37,7 +37,7 @@ Adafruit_MPU6050 mpu;
 // create variables for save FSR signal
 int fsrReading1, fsrReading2, fsrReading3, fsrReading4;
 // Change when Start/Stop Button is clicked
-bool SendingData = true;
+bool SendingData = false;
 
 void InitMPU() {
   Wire.begin();
@@ -116,12 +116,43 @@ void loop() {
       Serial.println("Failed to connect");
       return;
     }
+
   }
 
-  if(SendingData){
+  if(!SendingData) {
+    // first 0.2s data for accelerometer standard 
+    initAccData();
+  }
+  else{
     sendData();
   }
 
+}
+
+void initAccData() {
+  int count = 0;
+  sensors_event_t a, g, temp;    //instances to read sensor value
+  // Reading Start
+  mpu.getEvent(&a, &g, &temp);
+  float ax_avg = 0.0;
+  float ay_avg = 0.0;
+  float az_avg = 0.0;
+
+  while(count < 20){
+    ax_avg += a.acceleration.x;
+    ay_avg += a.acceleration.y;
+    az_avg += a.acceleration.z;
+    count++;
+    delay(10);
+  }
+  ax_avg /= 20;
+  ay_avg /= 20;
+  az_avg /= 20;
+
+  tb.sendTelemetryFloat("Ax_Avg", ax_avg);
+  tb.sendTelemetryFloat("Ay_Avg", ay_avg);
+  tb.sendTelemetryFloat("Az_Avg", az_avg);
+  SendingData = true;
 }
 
 void sendData(){
@@ -149,5 +180,5 @@ void sendData(){
   serializeJson(SensorValues, buffer);
   tb.sendTelemetryJson(buffer);
   Serial.println("Data Sending...");
-  delay(100);
+  delay(10);
 }
