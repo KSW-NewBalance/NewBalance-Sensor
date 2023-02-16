@@ -149,9 +149,9 @@ void initAccData() {
   ay_avg /= 20;
   az_avg /= 20;
 
-  tb.sendTelemetryFloat("Ax_Avg", ax_avg);
-  tb.sendTelemetryFloat("Ay_Avg", ay_avg);
-  tb.sendTelemetryFloat("Az_Avg", az_avg);
+  tb.sendTelemetryFloat("gacc_x", ax_avg);
+  tb.sendTelemetryFloat("gacc_y", ay_avg);
+  tb.sendTelemetryFloat("gacc_z", az_avg);
   SendingData = true;
 }
 
@@ -165,9 +165,9 @@ void sendData(){
   fsrReading4 = analogRead(FORCE_SENSOR_PIN4); 
 
   StaticJsonDocument<500> SensorValues;
-  SensorValues["AccelX"] = a.acceleration.x;
-  SensorValues["AccelY"] = a.acceleration.y;
-  SensorValues["AccelZ"] = a.acceleration.z;
+  SensorValues["acc_x"] = a.acceleration.x;
+  SensorValues["acc_y"] = a.acceleration.y;
+  SensorValues["acc_z"] = a.acceleration.z;
   SensorValues["GyroX"] = g.gyro.x;
   SensorValues["GyroY"] = g.gyro.y;
   SensorValues["GyroZ"] = g.gyro.z;
