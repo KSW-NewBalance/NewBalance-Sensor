@@ -13,16 +13,21 @@
 #define FORCE_SENSOR_PIN4 35 // ESP32 pin GIOP36 (ADC7): the FSR and 10K pulldown are connected to A7
 
 
+// the callback will be called for every shared attribute changed on the device
+constexpr std::array<const char*, 1U> SUBSCRIBED_SHARED_ATTRIBUTES = {
+  "isRunning"
+};
+
 // Baud rate for the debugging serial connection
 constexpr uint32_t SERIAL_DEBUG_BAUD PROGMEM = 115200U;
 // WiFi information
-constexpr char WIFI_SSID[] PROGMEM = "YOUR_WIFI_NAME";
+constexpr char WIFI_SSID[] PROGMEM = "YOUR_WIFI_SSID(NAME)";
 constexpr char WIFI_PASSWORD[] PROGMEM = "YOUR_WIFI_PASSWORD";
 // See https://thingsboard.io/docs/getting-started-guides/helloworld/
 // to understand how to obtain an access token
-constexpr char TOKEN[] PROGMEM = "YOUR_THINGSBOARD_TOKEN";
+constexpr char TOKEN[] PROGMEM = "YOUR_THINGSBOARD_DEVICE_TOKEN";
 // Thingsboard we want to establish a connection too
-constexpr char THINGSBOARD_SERVER[] PROGMEM = "demo.thingsboard.io";
+constexpr char THINGSBOARD_SERVER[] PROGMEM = "YOUT_SERVER_IP_ADDRESS";
 // MQTT port used to communicate with the server, 1883 is the default unencrypted MQTT port
 constexpr uint16_t THINGSBOARD_PORT PROGMEM = 1883U;
 // Maximum size packets will ever be sent or received by the underlying MQTT client,
@@ -36,9 +41,14 @@ ThingsBoardSized<MAX_MESSAGE_SIZE> tb(espClient);
 Adafruit_MPU6050 mpu;
 // create variables for save FSR signal
 int fsrReading1, fsrReading2, fsrReading3, fsrReading4;
+// Statuses for subscribing to shared attributes
+bool subscribed = false;
 // Change when Start/Stop Button is clicked
+bool runningStatus = false;
 bool SendingData = false;
 
+/// @brief Initialzes Inertial Measurement Sensor,
+/// setting accelerometer and gyroscope range, and filter's bandwidth
 void InitMPU() {
   Wire.begin();
   while(!Serial){
@@ -64,6 +74,8 @@ void InitMPU() {
   delay(100);
 }
 
+/// @brief Initalizes WiFi connection,
+// will endlessly delay until a connection has been successfully established
 void InitWiFi() {
   Serial.println("Connecting to AP ...");
   // Attempting to establish a connection to the given WiFi network
@@ -88,6 +100,26 @@ const bool reconnect() {
   InitWiFi();
   return true;
 }
+
+void processRunningStatusUpdate(const Shared_Attribute_Data &data) {
+  for(auto it = data.begin(); it != data.end(); ++it) {
+    Serial.println(it->key().c_str());
+    // Shared attributes have to be parsed by their type.
+    Serial.println(it->value().as<const char*>());
+  }
+  int jsonSize = JSON_STRING_SIZE(measureJson(data));
+  char buffer[jsonSize];
+  serializeJson(data, buffer, jsonSize);
+  Serial.println(buffer);
+  runningStatus = data["isRunning"];
+  if(runningStatus == false) {
+    SendingData = false;
+  }
+}
+
+//callback when the shared attribute is changed
+const Shared_Attribute_Callback callback(SUBSCRIBED_SHARED_ATTRIBUTES.cbegin(), SUBSCRIBED_SHARED_ATTRIBUTES.cend(), processRunningStatusUpdate);
+
 
 void setup() {
   // If analog input pin 0 is unconnected, random analog
@@ -118,15 +150,26 @@ void loop() {
     }
 
   }
-
-  if(!SendingData) {
-    // first 0.2s data for accelerometer standard 
-    initAccData();
+  if(!subscribed) {
+    Serial.println("Subscribing for shared attribute updates...");
+    if(!tb.Shared_Attributes_Subscribe(callback)) {
+      Serial.println("Failed to subscribe for shared attribute updates");
+      return;
+    }
+    Serial.println("Subscribe done");
+    subscribed = true;
   }
-  else{
-    sendData();
-  }
 
+  if (runningStatus) {
+    if(!SendingData) {
+      // first 0.2s data for accelerometer standard 
+      initAccData();
+    }
+    else{
+      sendData();
+    }
+  }
+  tb.loop();
 }
 
 void initAccData() {
@@ -179,6 +222,6 @@ void sendData(){
   char buffer[500];
   serializeJson(SensorValues, buffer);
   tb.sendTelemetryJson(buffer);
-  Serial.println("Data Sending...");
   delay(10);
+
 }
