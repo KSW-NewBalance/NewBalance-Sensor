@@ -21,13 +21,13 @@ constexpr std::array<const char*, 1U> SUBSCRIBED_SHARED_ATTRIBUTES = {
 // Baud rate for the debugging serial connection
 constexpr uint32_t SERIAL_DEBUG_BAUD PROGMEM = 115200U;
 // WiFi information
-constexpr char WIFI_SSID[] PROGMEM = "YOUR_WIFI_SSID(NAME)";
+constexpr char WIFI_SSID[] PROGMEM = "YOUR_WIFI_SSID_NAME";
 constexpr char WIFI_PASSWORD[] PROGMEM = "YOUR_WIFI_PASSWORD";
 // See https://thingsboard.io/docs/getting-started-guides/helloworld/
 // to understand how to obtain an access token
-constexpr char TOKEN[] PROGMEM = "YOUR_THINGSBOARD_DEVICE_TOKEN";
+constexpr char TOKEN[] PROGMEM = "YOUR_DEVICE_TOKEN";
 // Thingsboard we want to establish a connection too
-constexpr char THINGSBOARD_SERVER[] PROGMEM = "YOUT_SERVER_IP_ADDRESS";
+constexpr char THINGSBOARD_SERVER[] PROGMEM = "YOUR_THINGSBOARD_SERVER_IP";
 // MQTT port used to communicate with the server, 1883 is the default unencrypted MQTT port
 constexpr uint16_t THINGSBOARD_PORT PROGMEM = 1883U;
 // Maximum size packets will ever be sent or received by the underlying MQTT client,
@@ -45,7 +45,6 @@ int fsrReading1, fsrReading2, fsrReading3, fsrReading4;
 bool subscribed = false;
 // Change when Start/Stop Button is clicked
 bool runningStatus = false;
-bool SendingData = false;
 
 /// @brief Initialzes Inertial Measurement Sensor,
 /// setting accelerometer and gyroscope range, and filter's bandwidth
@@ -112,9 +111,6 @@ void processRunningStatusUpdate(const Shared_Attribute_Data &data) {
   serializeJson(data, buffer, jsonSize);
   Serial.println(buffer);
   runningStatus = data["isRunning"];
-  if(runningStatus == false) {
-    SendingData = false;
-  }
 }
 
 //callback when the shared attribute is changed
@@ -161,41 +157,9 @@ void loop() {
   }
 
   if (runningStatus) {
-    if(!SendingData) {
-      // first 0.2s data for accelerometer standard 
-      initAccData();
-    }
-    else{
-      sendData();
-    }
+    sendData(); 
   }
   tb.loop();
-}
-
-void initAccData() {
-  int count = 0;
-  sensors_event_t a, g, temp;    //instances to read sensor value
-  // Reading Start
-  mpu.getEvent(&a, &g, &temp);
-  float ax_avg = 0.0;
-  float ay_avg = 0.0;
-  float az_avg = 0.0;
-
-  while(count < 20){
-    ax_avg += a.acceleration.x;
-    ay_avg += a.acceleration.y;
-    az_avg += a.acceleration.z;
-    count++;
-    delay(10);
-  }
-  ax_avg /= 20;
-  ay_avg /= 20;
-  az_avg /= 20;
-
-  tb.sendTelemetryFloat("gacc_x", ax_avg);
-  tb.sendTelemetryFloat("gacc_y", ay_avg);
-  tb.sendTelemetryFloat("gacc_z", az_avg);
-  SendingData = true;
 }
 
 void sendData(){
@@ -206,22 +170,22 @@ void sendData(){
   fsrReading2 = analogRead(FORCE_SENSOR_PIN2);
   fsrReading3 = analogRead(FORCE_SENSOR_PIN3);
   fsrReading4 = analogRead(FORCE_SENSOR_PIN4); 
-
+  // Make Json Document to send data
   StaticJsonDocument<500> SensorValues;
-  SensorValues["acc_x"] = a.acceleration.x;
-  SensorValues["acc_y"] = a.acceleration.y;
-  SensorValues["acc_z"] = a.acceleration.z;
-  SensorValues["GyroX"] = g.gyro.x;
-  SensorValues["GyroY"] = g.gyro.y;
-  SensorValues["GyroZ"] = g.gyro.z;
-  SensorValues["1st FSR"] = fsrReading1;
-  SensorValues["2nd FSR"] = fsrReading2;
-  SensorValues["3rd FSR"] = fsrReading3;
-  SensorValues["4th FSR"] = fsrReading4;
-
+  SensorValues["acc_x"] = a.acceleration.x;   // MPU6050's acceleration value in x-axis direction
+  SensorValues["acc_y"] = a.acceleration.y;   // MPU6050's acceleration value in y-axis direction
+  SensorValues["acc_z"] = a.acceleration.z;   // MPU6050's acceleration value in z-axis direction
+  SensorValues["gyro_x"] = g.gyro.x;   // MPU6050's gyro sensor value in x-axis direction
+  SensorValues["gyro_y"] = g.gyro.y;   // MPU6050's gyro sensor value in y-axis direction
+  SensorValues["gyro_z"] = g.gyro.z;   // MPU6050's gyro sensor value in z-axis direction
+  SensorValues["fsr_1st"] = fsrReading1;    // The forefoot's force sensitive resistor value
+  SensorValues["fsr_2nd"] = fsrReading2;    // The midfoot - left's force sensitive resistor value
+  SensorValues["fsr_3rd"] = fsrReading3;    // The midfoot - right's force sensitive resistor value
+  SensorValues["fsr_4th"] = fsrReading4;    // The rearfoot's force sensitive resistor value
+  // Start sending data
   char buffer[500];
   serializeJson(SensorValues, buffer);
   tb.sendTelemetryJson(buffer);
-  delay(10);
-
+  // End sending data
+  delay(10);  // wait for next input
 }
