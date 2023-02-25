@@ -28,7 +28,7 @@ constexpr char WIFI_PASSWORD[] PROGMEM = "YOUR_WIFI_PASSWORD";
 // to understand how to obtain an access token
 constexpr char TOKEN[] PROGMEM = "YOUR_THINGSBOARD_DEVICE_TOKEN";
 // Thingsboard we want to establish a connection too
-constexpr char THINGSBOARD_SERVER[] PROGMEM = "YOUR_THINGBOARD_SERVER_IP";
+constexpr char THINGSBOARD_SERVER[] PROGMEM = "YOUR_THINGSBOARD_SERVER_IP";
 // MQTT port used to communicate with the server, 1883 is the default unencrypted MQTT port
 constexpr uint16_t THINGSBOARD_PORT PROGMEM = 1883U;
 // Maximum size packets will ever be sent or received by the underlying MQTT client
